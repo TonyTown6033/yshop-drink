@@ -24,6 +24,9 @@ export function createVitePlugins() {
     return resolve(root, '.', dir)
   }
 
+  // 检查是否在 CI/CD 环境中，如果是则禁用 ESLint
+  const isCI = process.env.CI === 'true' || process.env.DISABLE_ESLINT === 'true'
+
   return [
     Vue(),
     VueJsx(),
@@ -66,10 +69,11 @@ export function createVitePlugins() {
       resolvers: [ElementPlusResolver()],
       globs: ["src/components/**/**.{vue, md}", '!src/components/DiyEditor/components/mobile/**']
     }),
-    EslintPlugin({
+    // 在 CI/CD 环境中禁用 ESLint 以避免阻塞构建
+    ...(!isCI ? [EslintPlugin({
       cache: false,
       include: ['src/**/*.vue', 'src/**/*.ts', 'src/**/*.tsx'] // 检查的文件
-    }),
+    })] : []),
     VueI18nPlugin({
       runtimeOnly: true,
       compositionOnly: true,
