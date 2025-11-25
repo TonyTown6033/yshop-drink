@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: yshop-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: yixiang-drink
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+      - ./yshop-drink-boot3/sql:/docker-entrypoint-initdb.d
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: yshop-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+    command: redis-server --appendonly yes --requirepass redis123456
+
+networks:
+  default:
+    name: yshop-network

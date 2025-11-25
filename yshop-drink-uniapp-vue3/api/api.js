@@ -57,12 +57,13 @@ function baseRequest(options) {
     ...options.headers,
   }
 
-  // if (options.login === true) {
-  options.headers = {
-    ...options.headers,
-    Authorization: 'Bearer ' + token,
+  // 只有不是明确 false 时才添加 token
+  if (options.login !== false) {
+    options.headers = {
+      ...options.headers,
+      Authorization: 'Bearer ' + token,
+    }
   }
-  // }
 
   // 结构请求需要的参数
   const { url, params, data, login, ...option } = options
@@ -94,7 +95,8 @@ function baseRequest(options) {
       }
 
     
-      if (data.code == 401) {
+      // 如果是不需要登录的接口，不要拦截 401
+      if (data.code == 401 && options.login !== false) {
         uni.hideLoading()
         handleLoginFailure()
         uni.showToast({
