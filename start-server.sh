@@ -75,6 +75,54 @@ check_port() {
     fi
 }
 
+# 清理端口占用
+clean_port() {
+    local port=$1
+    local service_name=$2
+    
+    if check_port $port; then
+        log_warning "端口 ${port} 已被占用"
+        
+        # 获取占用端口的进程信息
+        local pid=$(lsof -ti :$port)
+        local process_name=$(ps -p $pid -o comm= 2>/dev/null || echo "未知进程")
+        
+        log_info "占用进程: PID=${pid}, 名称=${process_name}"
+        
+        # 检查是否是 Docker 容器
+        if docker ps --format "{{.Names}}" | grep -q "yshop-"; then
+            log_info "检测到 YSHOP 相关容器，尝试停止..."
+            docker stop $(docker ps -q --filter "name=yshop-") 2>/dev/null || true
+            sleep 2
+        fi
+        
+        # 再次检查端口
+        if check_port $port; then
+            log_warning "端口仍被占用，尝试强制停止进程..."
+            read -p "是否强制停止占用端口 ${port} 的进程 (PID: ${pid})? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                kill -9 $pid 2>/dev/null || true
+                sleep 1
+                
+                if check_port $port; then
+                    log_error "端口 ${port} 清理失败"
+                    return 1
+                else
+                    log_success "端口 ${port} 已清理"
+                fi
+            else
+                log_error "用户取消清理，无法继续"
+                return 1
+            fi
+        else
+            log_success "端口 ${port} 已清理"
+        fi
+    fi
+    
+    return 0
+}
+
 # 配置国内镜像源（以实际用户身份）
 configure_mirrors() {
     echo ""
@@ -423,6 +471,12 @@ start_docker_containers() {
         log_error "未找到 SQL 文件: ${SQL_FILE}"
         exit 1
     fi
+    
+    # 清理端口占用
+    log_info "检查并清理端口占用..."
+    clean_port 3306 "MySQL" || exit 1
+    clean_port 6379 "Redis" || exit 1
+    log_success "端口检查完成"
     
     # 检查容器是否已运行
     MYSQL_FIRST_RUN=false
