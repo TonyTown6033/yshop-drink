@@ -82,8 +82,8 @@ jobs:
         run: |
           cd yshop-drink-vue3
           pnpm config set registry https://registry.npmmirror.com
-          pnpm install
-          pnpm run build
+          pnpm install --no-frozen-lockfile
+          pnpm run build:prod
       
       - name: Prepare Deploy Package
         run: |

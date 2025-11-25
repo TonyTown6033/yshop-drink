@@ -127,7 +127,84 @@ Error: Some specified paths were not resolved, unable to cache dependencies.
 
 ---
 
-### 错误4：前端构建失败
+### 错误4：找不到构建脚本
+
+#### 错误信息
+```
+ERR_PNPM_NO_SCRIPT  Missing script: build
+Command "build" not found. Did you mean "pnpm run build:dev"?
+```
+
+#### 原因
+- package.json 中没有对应的脚本
+- 使用了错误的脚本名称
+
+#### 解决方案
+
+**已修复！** 查看 package.json 中的实际脚本：
+
+```bash
+# 查看可用脚本
+cat yshop-drink-vue3/package.json | grep "build:"
+
+# 应该使用
+pnpm run build:prod   # 生产环境
+pnpm run build:local  # 本地环境
+pnpm run build:dev    # 开发环境
+```
+
+**workflow 已更新为**：
+```yaml
+- name: Build Frontend
+  run: |
+    cd yshop-drink-vue3
+    pnpm run build:prod  # 正确的命令
+```
+
+详细说明：查看 [GITHUB-ACTIONS-BUILD-FIX.md](../GITHUB-ACTIONS-BUILD-FIX.md)
+
+---
+
+### 错误5：Peer dependencies 警告
+
+#### 错误信息
+```
+WARN  Issues with peer dependencies found
+├─┬ pinia 2.3.1
+│ └── ✕ unmet peer vue@"^2.7.0 || ^3.5.11": found 3.4.21
+```
+
+#### 原因
+- 依赖包要求的 Vue 版本与项目不匹配
+- 通常是警告，不会阻止构建
+
+#### 解决方案
+
+**方案1：忽略警告**（已采用）
+```yaml
+# 添加参数忽略警告
+pnpm install --no-frozen-lockfile
+```
+
+**方案2：升级 Vue**（需要测试）
+```bash
+# 升级到 3.5.x
+pnpm add vue@^3.5.0
+
+# 全面测试后提交
+git add package.json pnpm-lock.yaml
+git commit -m "Upgrade Vue to 3.5.x"
+```
+
+**方案3：降级依赖**
+```bash
+# 降级到兼容版本
+pnpm add pinia@2.1.x
+```
+
+---
+
+### 错误6：前端构建失败
 
 #### 错误信息
 ```
@@ -173,7 +250,7 @@ git push
 
 ---
 
-### 错误5：创建 Release 失败
+### 错误7：创建 Release 失败
 
 #### 错误信息
 ```
@@ -220,7 +297,7 @@ gh release delete v2.9.0 --yes
 
 ---
 
-### 错误6：磁盘空间不足
+### 错误8：磁盘空间不足
 
 #### 错误信息
 ```
@@ -264,7 +341,7 @@ GitHub Actions runner 磁盘空间有限（约14GB）
 
 ---
 
-### 错误7：网络超时
+### 错误9：网络超时
 
 #### 错误信息
 ```

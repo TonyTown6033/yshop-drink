@@ -101,7 +101,7 @@ build_frontend() {
     
     # 编译生产版本
     log_info "开始编译生产版本..."
-    pnpm run build
+    pnpm run build:prod
     
     if [ $? -eq 0 ]; then
         log_success "前端编译成功"
