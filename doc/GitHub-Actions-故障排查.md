@@ -85,7 +85,49 @@ mvn dependency:resolve
 
 ---
 
-### 错误3：前端构建失败
+### 错误3：Node.js 缓存失败
+
+#### 错误信息
+```
+Error: Some specified paths were not resolved, unable to cache dependencies.
+```
+
+#### 原因
+- 缓存配置与实际包管理器不匹配（配置了 npm 但使用 pnpm）
+- cache-dependency-path 路径不正确
+- lockfile 不存在
+
+#### 解决方案
+
+**已修复！** 现在使用正确的 pnpm 配置：
+
+```yaml
+- name: Set up Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: '18'
+
+- name: Install pnpm
+  uses: pnpm/action-setup@v2
+  with:
+    version: 8
+    run_install: false
+
+- name: Setup pnpm cache
+  uses: actions/cache@v4
+  with:
+    path: ${{ env.STORE_PATH }}
+    key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+```
+
+**如果手动配置**：
+1. 不要混用 npm 和 pnpm
+2. 使用 `pnpm/action-setup` action
+3. 确保 `pnpm-lock.yaml` 存在并已提交
+
+---
+
+### 错误4：前端构建失败
 
 #### 错误信息
 ```
@@ -131,7 +173,7 @@ git push
 
 ---
 
-### 错误4：创建 Release 失败
+### 错误5：创建 Release 失败
 
 #### 错误信息
 ```
@@ -178,7 +220,7 @@ gh release delete v2.9.0 --yes
 
 ---
 
-### 错误5：磁盘空间不足
+### 错误6：磁盘空间不足
 
 #### 错误信息
 ```
@@ -222,7 +264,7 @@ GitHub Actions runner 磁盘空间有限（约14GB）
 
 ---
 
-### 错误6：网络超时
+### 错误7：网络超时
 
 #### 错误信息
 ```
