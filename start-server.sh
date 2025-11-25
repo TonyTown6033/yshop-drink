@@ -75,7 +75,7 @@ check_port() {
     fi
 }
 
-# 配置国内镜像源
+# 配置国内镜像源（以实际用户身份）
 configure_mirrors() {
     echo ""
     echo -e "${GREEN}================================${NC}"
@@ -121,6 +121,21 @@ EOF
         pnpm config set registry https://registry.npmmirror.com 2>/dev/null || true
         echo -e "${GREEN}[SUCCESS]${NC} pnpm 镜像配置完成"
     fi
+    
+    # 4. 配置 nvm 镜像
+    if [ -d "${REAL_HOME}/.nvm" ]; then
+        echo -e "${BLUE}[INFO]${NC} 配置 nvm 淘宝镜像..."
+        export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node
+        export NVM_IOJS_ORG_MIRROR=https://npmmirror.com/mirrors/iojs
+        
+        # 写入配置文件
+        if ! grep -q "NVM_NODEJS_ORG_MIRROR" "${REAL_HOME}/.bashrc" 2>/dev/null; then
+            echo 'export NVM_NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node' >> "${REAL_HOME}/.bashrc"
+            echo 'export NVM_IOJS_ORG_MIRROR=https://npmmirror.com/mirrors/iojs' >> "${REAL_HOME}/.bashrc"
+        fi
+        
+        echo -e "${GREEN}[SUCCESS]${NC} nvm 镜像配置完成"
+    fi
 }
 
 # 安装 JDK 17
@@ -139,16 +154,67 @@ install_maven() {
     log_success "Maven 安装完成"
 }
 
-# 安装 Node.js 和 pnpm
+# 加载 nvm
+load_nvm() {
+    export NVM_DIR="${REAL_HOME}/.nvm"
+    
+    # 尝试加载 nvm
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        . "$NVM_DIR/nvm.sh"
+        return 0
+    elif [ -s "/usr/local/opt/nvm/nvm.sh" ]; then
+        export NVM_DIR="/usr/local/opt/nvm"
+        . "$NVM_DIR/nvm.sh"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 安装 nvm
+install_nvm() {
+    log_info "安装 nvm（Node Version Manager）..."
+    
+    # 以实际用户身份安装 nvm
+    sudo -u ${REAL_USER} bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash'
+    
+    if [ $? -ne 0 ]; then
+        log_error "nvm 安装失败"
+        exit 1
+    fi
+    
+    # 设置 nvm 环境变量
+    export NVM_DIR="${REAL_HOME}/.nvm"
+    
+    # 加载 nvm
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    
+    log_success "nvm 安装完成"
+}
+
+# 安装 Node.js 和 pnpm（使用 nvm）
 install_nodejs() {
-    log_info "安装 Node.js 18 LTS..."
+    log_info "使用 nvm 安装 Node.js 18 LTS..."
     
-    # 使用 NodeSource 仓库安装 Node.js 18.x
-    log_info "添加 NodeSource 仓库..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    # 确保 nvm 已安装
+    if ! load_nvm; then
+        log_info "nvm 未安装，开始安装 nvm..."
+        install_nvm
+        load_nvm
+    fi
     
-    log_info "安装 Node.js..."
-    apt-get install -y nodejs
+    # 以实际用户身份安装 Node.js
+    log_info "安装 Node.js 18..."
+    sudo -u ${REAL_USER} bash -c ". ${NVM_DIR}/nvm.sh && nvm install 18"
+    
+    # 设置默认版本
+    log_info "设置默认版本..."
+    sudo -u ${REAL_USER} bash -c ". ${NVM_DIR}/nvm.sh && nvm alias default 18"
+    sudo -u ${REAL_USER} bash -c ". ${NVM_DIR}/nvm.sh && nvm use 18"
+    
+    # 重新加载以获取新安装的 Node.js
+    load_nvm
+    nvm use 18
     
     # 验证安装
     if command_exists node && command_exists npm; then
@@ -250,41 +316,54 @@ check_environment() {
         install_maven
     fi
     
+    # 尝试加载 nvm
+    load_nvm
+    
     # 检查 Node.js
     if command_exists node; then
         NODE_VERSION=$(node -v)
         NODE_MAJOR_VERSION=$(echo $NODE_VERSION | sed 's/v//' | cut -d. -f1)
         log_info "Node.js 版本: ${NODE_VERSION}"
         
+        # 显示 nvm 信息
+        if load_nvm && command -v nvm >/dev/null 2>&1; then
+            log_info "Node.js 管理: nvm"
+            CURRENT_NODE=$(sudo -u ${REAL_USER} bash -c ". ${NVM_DIR}/nvm.sh && nvm current")
+            log_info "当前使用: ${CURRENT_NODE}"
+        fi
+        
         # 检查版本是否满足要求（需要 v16+）
         if [ "$NODE_MAJOR_VERSION" -lt 16 ]; then
             log_warning "Node.js 版本过低（需要 v16+），当前: ${NODE_VERSION}"
-            log_info "请升级 Node.js"
-            log_info "升级方法 1（推荐）："
-            echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
-            echo "  sudo apt-get install -y nodejs"
-            log_info "升级方法 2（使用 nvm）："
-            echo "  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
-            echo "  nvm install 18"
-            echo "  nvm use 18"
-            exit 1
+            
+            # 检查是否使用 nvm
+            if load_nvm && command -v nvm >/dev/null 2>&1; then
+                log_info "检测到 nvm，尝试安装 Node.js 18..."
+                sudo -u ${REAL_USER} bash -c ". ${NVM_DIR}/nvm.sh && nvm install 18 && nvm use 18 && nvm alias default 18"
+                
+                # 重新加载
+                load_nvm
+                nvm use 18
+                
+                NODE_VERSION=$(node -v)
+                log_success "已切换到 Node.js ${NODE_VERSION}"
+            else
+                log_error "Node.js 版本不满足要求"
+                log_info "将使用 nvm 安装 Node.js 18..."
+                install_nodejs
+            fi
         fi
     else
         log_error "未检测到 Node.js"
-        log_info "请先安装 Node.js 18 LTS"
-        log_info "安装命令："
-        echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
-        echo "  sudo apt-get install -y nodejs"
-        exit 1
+        log_info "将使用 nvm 安装 Node.js 18 LTS..."
+        install_nodejs
     fi
     
     # 检查 npm
     if ! command_exists npm; then
-        log_error "npm 未找到，请重新安装 Node.js"
-        log_info "安装命令："
-        echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
-        echo "  sudo apt-get install -y nodejs"
-        exit 1
+        log_error "npm 未找到"
+        log_info "将使用 nvm 重新安装 Node.js..."
+        install_nodejs
     fi
     
     # 检查 pnpm
@@ -294,15 +373,17 @@ check_environment() {
     else
         log_warning "未检测到 pnpm，开始安装..."
         log_info "安装 pnpm..."
-        npm install -g pnpm
+        
+        # 以实际用户身份安装
+        sudo -u ${REAL_USER} bash -c "npm install -g pnpm"
         
         # 验证安装
         if command_exists pnpm; then
             log_success "pnpm 安装成功"
+            PNPM_VERSION=$(pnpm -v)
+            log_info "pnpm 版本: ${PNPM_VERSION}"
         else
             log_error "pnpm 安装失败"
-            log_info "手动安装命令："
-            echo "  npm install -g pnpm"
             exit 1
         fi
     fi
