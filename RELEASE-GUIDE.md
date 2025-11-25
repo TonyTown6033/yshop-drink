@@ -206,12 +206,18 @@ ps aux | grep yshop-server
 ### 构建失败
 
 ```bash
-# 查看构建日志
+# 1. 检查配置
+./check-github-actions.sh
+
+# 2. 查看构建日志
 gh run list
 gh run view <run-id> --log
 
-# 或访问 Web UI
+# 3. 或访问 Web UI
 https://github.com/YOUR_USERNAME/yshop-drink/actions
+
+# 4. 查看详细故障排查
+# 参考：doc/GitHub-Actions-故障排查.md
 ```
 
 ### 下载失败
@@ -245,6 +251,7 @@ tail -100 ~/logs/yshop-server.log
 ## 📚 相关文档
 
 - [GitHub Actions 部署指南](doc/GitHub-Actions部署指南.md) - 完整说明
+- [GitHub Actions 故障排查](doc/GitHub-Actions-故障排查.md) - 错误解决 ⚠️
 - [预编译部署指南](doc/预编译部署指南.md) - 本地编译方式
 - [端口清理指南](doc/端口清理指南.md) - 端口问题解决
 - [nvm 使用说明](doc/nvm使用说明.md) - Node.js 版本管理
