@@ -287,6 +287,135 @@ install_nodejs() {
     fi
 }
 
+# 从 GitHub Release 下载部署包
+download_github_release() {
+    print_title "下载 GitHub Release"
+    
+    local version=$1
+    local repo=$2
+    
+    # 如果没有指定仓库，尝试从 git remote 获取
+    if [ -z "$repo" ]; then
+        if command_exists git && [ -d "${PROJECT_DIR}/.git" ]; then
+            local remote_url=$(git -C "${PROJECT_DIR}" remote get-url origin 2>/dev/null)
+            if [[ $remote_url =~ github.com[:/](.+/.+)(\.git)?$ ]]; then
+                repo="${BASH_REMATCH[1]}"
+                repo="${repo%.git}"  # 移除 .git 后缀
+                log_info "从 git remote 获取仓库: ${repo}"
+            fi
+        fi
+    fi
+    
+    # 如果还是没有仓库信息
+    if [ -z "$repo" ]; then
+        log_error "无法确定 GitHub 仓库"
+        log_info "请使用 --github-repo 参数指定仓库"
+        log_info "例如: --github-repo username/yshop-drink"
+        exit 1
+    fi
+    
+    log_info "GitHub 仓库: ${repo}"
+    
+    # 如果没有指定版本，获取最新版本
+    if [ -z "$version" ]; then
+        log_info "获取最新版本信息..."
+        version=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        
+        if [ -z "$version" ]; then
+            log_error "无法获取最新版本信息"
+            log_info "请检查："
+            echo "  1. 仓库是否存在"
+            echo "  2. 是否有发布的 Release"
+            echo "  3. 网络连接是否正常"
+            exit 1
+        fi
+        
+        log_info "最新版本: ${version}"
+    fi
+    
+    # 构建下载 URL
+    local package_name="yshop-deploy-${version}.tar.gz"
+    local download_url="https://github.com/${repo}/releases/download/${version}/${package_name}"
+    local checksum_url="${download_url}.sha256"
+    
+    log_info "下载地址: ${download_url}"
+    
+    # 创建临时目录
+    local temp_dir="/tmp/yshop-release-$$"
+    mkdir -p "${temp_dir}"
+    
+    # 下载部署包
+    log_info "下载部署包..."
+    if ! curl -L -o "${temp_dir}/${package_name}" "${download_url}"; then
+        log_error "下载失败"
+        rm -rf "${temp_dir}"
+        exit 1
+    fi
+    
+    log_success "下载完成"
+    
+    # 下载校验和
+    log_info "下载校验文件..."
+    if curl -L -o "${temp_dir}/${package_name}.sha256" "${checksum_url}" 2>/dev/null; then
+        log_info "验证文件完整性..."
+        cd "${temp_dir}"
+        if sha256sum -c "${package_name}.sha256" 2>/dev/null; then
+            log_success "文件校验通过"
+        else
+            log_warning "文件校验失败，但继续执行"
+        fi
+        cd "${PROJECT_DIR}"
+    else
+        log_warning "未找到校验文件，跳过校验"
+    fi
+    
+    # 解压
+    log_info "解压部署包..."
+    tar -xzf "${temp_dir}/${package_name}" -C "${temp_dir}"
+    
+    # 复制文件
+    log_info "复制文件到项目目录..."
+    
+    # 复制后端 jar
+    if [ -d "${temp_dir}/backend" ]; then
+        mkdir -p "${BACKEND_DIR}/yshop-server/target"
+        cp ${temp_dir}/backend/yshop-server-*.jar "${BACKEND_DIR}/yshop-server/target/" 2>/dev/null || true
+        
+        local jar_file=$(ls ${BACKEND_DIR}/yshop-server/target/yshop-server-*.jar 2>/dev/null | head -n 1)
+        if [ -n "$jar_file" ]; then
+            log_success "后端文件已复制: $(basename $jar_file)"
+        else
+            log_error "后端文件复制失败"
+            rm -rf "${temp_dir}"
+            exit 1
+        fi
+    fi
+    
+    # 复制前端 dist
+    if [ -d "${temp_dir}/frontend/dist" ]; then
+        rm -rf "${FRONTEND_DIR}/dist"
+        cp -r "${temp_dir}/frontend/dist" "${FRONTEND_DIR}/"
+        log_success "前端文件已复制"
+    fi
+    
+    # 显示版本信息
+    if [ -f "${temp_dir}/VERSION" ]; then
+        echo ""
+        log_info "版本信息："
+        cat "${temp_dir}/VERSION" | sed 's/^/  /'
+        echo ""
+    fi
+    
+    # 清理临时文件
+    rm -rf "${temp_dir}"
+    
+    log_success "GitHub Release 部署包下载完成"
+    
+    # 设置跳过编译标志
+    SKIP_BUILD="true"
+    USE_PROD_BUILD="true"
+}
+
 # 配置 Docker（不重装）
 configure_docker() {
     log_info "配置 Docker..."
@@ -623,28 +752,52 @@ start_backend() {
         sleep 3
     fi
     
-    # 编译项目（以实际用户身份）
-    log_info "开始编译后端项目..."
-    log_info "这可能需要几分钟，请耐心等待..."
+    # 查找 jar 文件
+    JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server-*.jar" 2>/dev/null | head -n 1)
     
-    sudo -u ${REAL_USER} mvn clean install package -Dmaven.test.skip=true -T 1C 2>&1 | tee "${LOG_DIR}/backend-build.log"
-    
-    if [ $? -eq 0 ]; then
-        log_success "后端编译成功"
+    # 如果没有找到 jar 文件，或者设置了强制编译，则进行编译
+    if [ -z "$JAR_FILE" ] || [ "$SKIP_BUILD" != "true" ]; then
+        if [ -z "$JAR_FILE" ]; then
+            log_warning "未找到已编译的 jar 文件"
+        fi
+        
+        if [ "$SKIP_BUILD" = "true" ]; then
+            log_error "跳过编译模式下未找到 jar 文件"
+            log_info "请先编译项目或不使用 --skip-build 参数"
+            exit 1
+        fi
+        
+        # 编译项目（以实际用户身份）
+        log_info "开始编译后端项目..."
+        log_info "这可能需要几分钟，请耐心等待..."
+        
+        sudo -u ${REAL_USER} mvn clean install package -Dmaven.test.skip=true -T 1C 2>&1 | tee "${LOG_DIR}/backend-build.log"
+        
+        if [ $? -eq 0 ]; then
+            log_success "后端编译成功"
+        else
+            log_error "后端编译失败，请查看日志: ${LOG_DIR}/backend-build.log"
+            exit 1
+        fi
+        
+        # 重新查找 jar 文件
+        JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server-*.jar" | head -n 1)
+        
+        if [ -z "$JAR_FILE" ]; then
+            log_error "编译后仍未找到 jar 文件"
+            exit 1
+        fi
     else
-        log_error "后端编译失败，请查看日志: ${LOG_DIR}/backend-build.log"
-        exit 1
+        log_info "使用已编译的 jar 文件（跳过编译）"
+        
+        # 显示 jar 文件信息
+        JAR_SIZE=$(du -h "$JAR_FILE" | cut -f1)
+        JAR_DATE=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$JAR_FILE" 2>/dev/null || stat -c "%y" "$JAR_FILE" 2>/dev/null | cut -d'.' -f1)
+        log_info "jar 文件: $(basename $JAR_FILE)"
+        log_info "文件大小: ${JAR_SIZE}"
+        log_info "编译时间: ${JAR_DATE}"
     fi
     
-    # 查找并启动 jar 文件
-    JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server-*.jar" | head -n 1)
-    
-    if [ -z "$JAR_FILE" ]; then
-        log_error "未找到编译后的 jar 文件"
-        exit 1
-    fi
-    
-    log_info "找到 jar 文件: $(basename $JAR_FILE)"
     log_info "启动后端服务..."
     
     # 启动服务（以实际用户身份后台运行）
@@ -687,38 +840,65 @@ start_frontend() {
         sleep 2
     fi
     
-    # 检查是否已安装依赖（以实际用户身份）
-    if [ ! -d "node_modules" ]; then
-        log_info "安装前端依赖..."
-        sudo -u ${REAL_USER} pnpm install 2>&1 | tee "${LOG_DIR}/frontend-install.log"
+    # 检查是否使用生产构建
+    if [ -d "dist" ] && [ "$USE_PROD_BUILD" = "true" ]; then
+        log_info "使用生产构建（dist 目录）"
         
-        if [ $? -eq 0 ]; then
-            log_success "前端依赖安装成功"
-        else
-            log_error "前端依赖安装失败，请查看日志: ${LOG_DIR}/frontend-install.log"
-            exit 1
+        # 检查是否安装了 http-server
+        if ! command_exists http-server; then
+            log_info "安装 http-server..."
+            sudo -u ${REAL_USER} npm install -g http-server
         fi
+        
+        # 启动静态文件服务器
+        log_info "启动静态文件服务器..."
+        sudo -u ${REAL_USER} nohup http-server dist -p 80 \
+            > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
+        
+        FRONTEND_PID=$!
+        echo $FRONTEND_PID > "${LOG_DIR}/frontend.pid"
+        chown ${REAL_USER}:${REAL_USER} "${LOG_DIR}/frontend.pid"
+        
+        log_info "前端进程 PID: ${FRONTEND_PID}"
+        log_success "前端服务启动成功（生产模式）"
     else
-        log_info "前端依赖已安装"
+        # 开发模式
+        # 检查是否已安装依赖（以实际用户身份）
+        if [ ! -d "node_modules" ]; then
+            if [ "$SKIP_BUILD" = "true" ]; then
+                log_error "跳过编译模式下未找到 node_modules"
+                log_info "请先运行: pnpm install"
+                exit 1
+            fi
+            
+            log_info "安装前端依赖..."
+            sudo -u ${REAL_USER} pnpm install 2>&1 | tee "${LOG_DIR}/frontend-install.log"
+            
+            if [ $? -eq 0 ]; then
+                log_success "前端依赖安装成功"
+            else
+                log_error "前端依赖安装失败，请查看日志: ${LOG_DIR}/frontend-install.log"
+                exit 1
+            fi
+        else
+            log_info "前端依赖已安装"
+        fi
+        
+        # 启动开发服务器（以实际用户身份）
+        log_info "启动前端开发服务器..."
+        
+        sudo -u ${REAL_USER} nohup pnpm run dev \
+            > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
+        
+        FRONTEND_PID=$!
+        echo $FRONTEND_PID > "${LOG_DIR}/frontend.pid"
+        chown ${REAL_USER}:${REAL_USER} "${LOG_DIR}/frontend.pid"
+        
+        log_info "前端进程 PID: ${FRONTEND_PID}"
+        log_success "前端服务启动成功（开发模式）"
     fi
     
-    # 启动开发服务器（以实际用户身份）
-    log_info "启动前端开发服务器..."
-    
-    sudo -u ${REAL_USER} nohup pnpm run dev \
-        > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
-    
-    FRONTEND_PID=$!
-    echo $FRONTEND_PID > "${LOG_DIR}/frontend.pid"
-    chown ${REAL_USER}:${REAL_USER} "${LOG_DIR}/frontend.pid"
-    
-    log_info "前端进程 PID: ${FRONTEND_PID}"
     log_info "日志文件: ${LOG_DIR}/yshop-frontend.log"
-    
-    # 等待服务启动
-    sleep 5
-    
-    log_success "前端服务启动成功"
     log_info "前端地址: http://localhost:80"
 }
 
@@ -767,8 +947,74 @@ show_status() {
     echo ""
 }
 
+# 显示帮助信息
+show_help() {
+    echo "使用方法: sudo ./start-server.sh [选项]"
+    echo ""
+    echo "选项:"
+    echo "  --skip-build               跳过编译，使用已编译的文件"
+    echo "  --prod-frontend            使用前端生产构建（dist 目录）"
+    echo "  --github-release [版本]    从 GitHub Release 下载部署包"
+    echo "  --github-repo <repo>       指定 GitHub 仓库（默认从 git remote 获取）"
+    echo "  --help, -h                 显示此帮助信息"
+    echo ""
+    echo "示例:"
+    echo "  sudo ./start-server.sh                           # 正常启动（编译后启动）"
+    echo "  sudo ./start-server.sh --skip-build              # 跳过编译直接启动"
+    echo "  sudo ./start-server.sh --prod-frontend           # 使用前端生产构建"
+    echo "  sudo ./start-server.sh --github-release          # 使用最新 GitHub Release"
+    echo "  sudo ./start-server.sh --github-release v2.9.0   # 使用指定版本"
+    echo ""
+}
+
 # 主函数
 main() {
+    # 解析命令行参数
+    SKIP_BUILD="false"
+    USE_PROD_BUILD="false"
+    GITHUB_RELEASE="false"
+    GITHUB_VERSION=""
+    GITHUB_REPO=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skip-build)
+                SKIP_BUILD="true"
+                shift
+                ;;
+            --prod-frontend)
+                USE_PROD_BUILD="true"
+                shift
+                ;;
+            --github-release)
+                GITHUB_RELEASE="true"
+                shift
+                # 检查下一个参数是否是版本号（不以 -- 开头）
+                if [[ $# -gt 0 && ! "$1" =~ ^-- ]]; then
+                    GITHUB_VERSION="$1"
+                    shift
+                fi
+                ;;
+            --github-repo)
+                if [[ $# -lt 2 ]]; then
+                    log_error "--github-repo 需要指定仓库名称"
+                    exit 1
+                fi
+                GITHUB_REPO="$2"
+                shift 2
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "未知参数: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
     clear
     
     echo -e "${GREEN}"
@@ -776,6 +1022,20 @@ main() {
     echo "  YSHOP 意象点餐系统 - 启动脚本"
     echo "========================================"
     echo -e "${NC}"
+    
+    # 显示运行模式
+    if [ "$SKIP_BUILD" = "true" ]; then
+        log_info "运行模式: 跳过编译（使用已编译文件）"
+    else
+        log_info "运行模式: 完整编译并启动"
+    fi
+    
+    if [ "$USE_PROD_BUILD" = "true" ]; then
+        log_info "前端模式: 生产构建"
+    else
+        log_info "前端模式: 开发服务器"
+    fi
+    echo ""
     
     # 检查是否使用 sudo 运行
     if [ "$EUID" -ne 0 ]; then
@@ -794,6 +1054,16 @@ main() {
     fi
     
     log_info "实际用户: ${REAL_USER}"
+    
+    # 设置日志目录
+    LOG_DIR="${REAL_HOME}/logs"
+    mkdir -p "${LOG_DIR}"
+    chown ${REAL_USER}:${REAL_USER} "${LOG_DIR}"
+    
+    # 如果使用 GitHub Release，下载部署包
+    if [ "$GITHUB_RELEASE" = "true" ]; then
+        download_github_release "$GITHUB_VERSION" "$GITHUB_REPO"
+    fi
     
     # 检查环境
     check_environment

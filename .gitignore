@@ -2,8 +2,46 @@
 /.idea
 *.log
 *.DS_Store
+
+# 编译产物
 /yshop-drink-boot3/target/
-/yshop-drink-vue3/node_modules
-/yshop-drink-uniapp-vue3/node_moduls
+/yshop-drink-boot3/**/target/
+/yshop-drink-vue3/node_modules/
+/yshop-drink-vue3/dist/
+/yshop-drink-uniapp-vue3/node_modules/
+/yshop-drink-uniapp-vue3/dist/
+
+# Docker 数据
 /mysql-data/
 /redis-data/
+
+# 部署文件
+/deploy/
+yshop-deploy-*.tar.gz
+yshop-deploy-*.tar.gz.sha256
+
+# 日志和 PID 文件
+*.pid
+logs/
+
+# 临时文件
+/tmp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# 环境配置（敏感信息）
+.env.production
+application-prod.yaml
+
+# IDE
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# 系统文件
+.DS_Store
+Thumbs.db
