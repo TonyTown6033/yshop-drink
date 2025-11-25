@@ -143,16 +143,34 @@ install_maven() {
 install_nodejs() {
     log_info "安装 Node.js 18 LTS..."
     
-    # 安装 Node.js 18.x
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-    sudo apt-get install -y nodejs
+    # 使用 NodeSource 仓库安装 Node.js 18.x
+    log_info "添加 NodeSource 仓库..."
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
     
-    log_success "Node.js 安装完成"
+    log_info "安装 Node.js..."
+    apt-get install -y nodejs
+    
+    # 验证安装
+    if command_exists node && command_exists npm; then
+        log_success "Node.js 安装完成"
+        log_info "Node.js 版本: $(node -v)"
+        log_info "npm 版本: $(npm -v)"
+    else
+        log_error "Node.js 安装失败"
+        exit 1
+    fi
     
     # 安装 pnpm
     log_info "安装 pnpm..."
-    sudo npm install -g pnpm
-    log_success "pnpm 安装完成"
+    npm install -g pnpm
+    
+    if command_exists pnpm; then
+        log_success "pnpm 安装完成"
+        log_info "pnpm 版本: $(pnpm -v)"
+    else
+        log_error "pnpm 安装失败"
+        exit 1
+    fi
 }
 
 # 配置 Docker（不重装）
@@ -235,10 +253,38 @@ check_environment() {
     # 检查 Node.js
     if command_exists node; then
         NODE_VERSION=$(node -v)
+        NODE_MAJOR_VERSION=$(echo $NODE_VERSION | sed 's/v//' | cut -d. -f1)
         log_info "Node.js 版本: ${NODE_VERSION}"
+        
+        # 检查版本是否满足要求（需要 v16+）
+        if [ "$NODE_MAJOR_VERSION" -lt 16 ]; then
+            log_warning "Node.js 版本过低（需要 v16+），当前: ${NODE_VERSION}"
+            log_info "请升级 Node.js"
+            log_info "升级方法 1（推荐）："
+            echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
+            echo "  sudo apt-get install -y nodejs"
+            log_info "升级方法 2（使用 nvm）："
+            echo "  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash"
+            echo "  nvm install 18"
+            echo "  nvm use 18"
+            exit 1
+        fi
     else
-        log_error "未检测到 Node.js，开始安装..."
-        install_nodejs
+        log_error "未检测到 Node.js"
+        log_info "请先安装 Node.js 18 LTS"
+        log_info "安装命令："
+        echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
+        echo "  sudo apt-get install -y nodejs"
+        exit 1
+    fi
+    
+    # 检查 npm
+    if ! command_exists npm; then
+        log_error "npm 未找到，请重新安装 Node.js"
+        log_info "安装命令："
+        echo "  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -"
+        echo "  sudo apt-get install -y nodejs"
+        exit 1
     fi
     
     # 检查 pnpm
@@ -246,8 +292,19 @@ check_environment() {
         PNPM_VERSION=$(pnpm -v)
         log_info "pnpm 版本: ${PNPM_VERSION}"
     else
-        log_error "未检测到 pnpm，开始安装..."
-        sudo npm install -g pnpm
+        log_warning "未检测到 pnpm，开始安装..."
+        log_info "安装 pnpm..."
+        npm install -g pnpm
+        
+        # 验证安装
+        if command_exists pnpm; then
+            log_success "pnpm 安装成功"
+        else
+            log_error "pnpm 安装失败"
+            log_info "手动安装命令："
+            echo "  npm install -g pnpm"
+            exit 1
+        fi
     fi
     
     # 检查 Docker
