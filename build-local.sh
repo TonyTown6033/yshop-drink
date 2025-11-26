@@ -101,7 +101,17 @@ build_frontend() {
     
     # 编译生产版本
     log_info "开始编译生产版本..."
-    pnpm run build:prod
+    
+    # 询问是否跳过 ESLint
+    read -p "是否跳过 ESLint 检查? (y/n, 默认: n) " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        log_info "跳过 ESLint 检查..."
+        DISABLE_ESLINT=true pnpm run build:prod
+    else
+        pnpm run build:prod
+    fi
     
     if [ $? -eq 0 ]; then
         log_success "前端编译成功"

@@ -29,8 +29,16 @@
 ### 修复 #4: ESLint 检查导致构建失败
 **日期**: 2025-11-25  
 **问题**: ESLint 错误 `vue/no-ref-as-operand` 导致构建中断  
-**解决**: CI/CD 构建时临时禁用 ESLint 插件  
-**文档**: [ESLINT-ERROR-FIX.md](ESLINT-ERROR-FIX.md)
+**解决**: 通过环境变量优雅控制 ESLint 插件  
+**文档**: [SOLUTION-FINAL.md](SOLUTION-FINAL.md)
+
+---
+
+### 修复 #5: Maven 构建命令错误
+**日期**: 2025-11-25  
+**问题**: `mvn install package` 导致 jar 文件未生成  
+**解决**: 改用 `mvn clean package -DskipTests -T 1C`  
+**文档**: [MAVEN-BUILD-FIX.md](MAVEN-BUILD-FIX.md)
 
 ---
 
@@ -183,7 +191,8 @@ sudo ./start-server.sh --github-release v1.0.0
 - 📖 [GITHUB-ACTIONS-FIXED.md](GITHUB-ACTIONS-FIXED.md) - Actions v4 升级
 - 📖 [GITHUB-ACTIONS-UPDATE.md](GITHUB-ACTIONS-UPDATE.md) - pnpm 缓存修复
 - 📖 [GITHUB-ACTIONS-BUILD-FIX.md](GITHUB-ACTIONS-BUILD-FIX.md) - 构建脚本修复
-- 📖 [ESLINT-ERROR-FIX.md](ESLINT-ERROR-FIX.md) - ESLint 错误修复 ⭐
+- 📖 [SOLUTION-FINAL.md](SOLUTION-FINAL.md) - ESLint 优雅方案 ⭐
+- 📖 [MAVEN-BUILD-FIX.md](MAVEN-BUILD-FIX.md) - Maven 命令修复 ⭐
 
 ### 详细教程
 - 📖 [doc/GitHub-Actions部署指南.md](doc/GitHub-Actions部署指南.md) - 完整教程

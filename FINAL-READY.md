@@ -9,7 +9,7 @@
 | 1️⃣ | Actions v3 弃用 | 升级到 v4 | ✅ |
 | 2️⃣ | pnpm 缓存错误 | 正确配置 | ✅ |
 | 3️⃣ | build 脚本不存在 | 使用 build:prod | ✅ |
-| 4️⃣ | ESLint 阻止构建 | CI/CD 跳过 ESLint | ✅ |
+| 4️⃣ | ESLint 阻止构建 | 环境变量禁用 ESLint | ✅ |
 
 ---
 
@@ -74,7 +74,7 @@ sudo ./start-server.sh --github-release v1.0.0
    - ❌ `pnpm run build` → ✅ `pnpm run build:prod`
 
 4. **ESLint 处理**
-   - ❌ 阻止构建 → ✅ CI/CD 时跳过
+   - ❌ 阻止构建 → ✅ 环境变量控制（优雅方案）
 
 ---
 
@@ -111,7 +111,8 @@ sudo ./start-server.sh --github-release v1.0.0
 - 📖 [GITHUB-ACTIONS-FIXED.md](GITHUB-ACTIONS-FIXED.md) - 修复 #1: Actions v4
 - 📖 [GITHUB-ACTIONS-UPDATE.md](GITHUB-ACTIONS-UPDATE.md) - 修复 #2: pnpm 缓存
 - 📖 [GITHUB-ACTIONS-BUILD-FIX.md](GITHUB-ACTIONS-BUILD-FIX.md) - 修复 #3: build 脚本
-- 📖 **[ESLINT-ERROR-FIX.md](ESLINT-ERROR-FIX.md)** - 修复 #4: ESLint 错误 ⭐
+- 📖 [ESLINT-ERROR-FIX.md](ESLINT-ERROR-FIX.md) - 修复 #4: ESLint 错误
+- 📖 **[SOLUTION-FINAL.md](SOLUTION-FINAL.md)** - 最终解决方案 ⭐⭐⭐
 
 ### 完整教程 📘
 - 📖 [doc/GitHub-Actions部署指南.md](doc/GitHub-Actions部署指南.md) - 详细教程

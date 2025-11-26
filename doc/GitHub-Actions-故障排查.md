@@ -39,7 +39,45 @@ git push origin v1.0.1-test
 
 ---
 
-### 错误2：Maven 依赖下载失败
+### 错误2：Maven 构建命令错误
+
+#### 错误信息
+```
+cp: cannot stat 'yshop-drink-boot3/yshop-server/target/yshop-server-*.jar': No such file or directory
+```
+
+#### 原因
+- Maven 构建命令不正确
+- 使用了 `mvn install package`（冗余命令）
+- jar 文件未生成
+
+#### 解决方案
+
+**已修复！** 使用正确的 Maven 命令：
+
+```yaml
+- name: Build Backend
+  run: |
+    cd yshop-drink-boot3
+    mvn clean package -DskipTests -T 1C
+    
+    # 验证 jar 文件
+    if [ ! -f yshop-server/target/yshop-server-*.jar ]; then
+      echo "Error: JAR file not found"
+      exit 1
+    fi
+```
+
+**Maven 生命周期说明**：
+- `package`: 打包成 jar（我们需要的）✅
+- `install`: package + 安装到本地仓库
+- ❌ 不要同时使用 `install package`
+
+详细说明：查看 [MAVEN-BUILD-FIX.md](../MAVEN-BUILD-FIX.md)
+
+---
+
+### 错误3：Maven 依赖下载失败
 
 #### 错误信息
 ```
@@ -85,7 +123,7 @@ mvn dependency:resolve
 
 ---
 
-### 错误3：Node.js 缓存失败
+### 错误4：Node.js 缓存失败
 
 #### 错误信息
 ```
@@ -127,7 +165,7 @@ Error: Some specified paths were not resolved, unable to cache dependencies.
 
 ---
 
-### 错误4：找不到构建脚本
+### 错误5：找不到构建脚本
 
 #### 错误信息
 ```
@@ -165,7 +203,7 @@ pnpm run build:dev    # 开发环境
 
 ---
 
-### 错误5：Peer dependencies 警告
+### 错误6：Peer dependencies 警告
 
 #### 错误信息
 ```
@@ -204,7 +242,7 @@ pnpm add pinia@2.1.x
 
 ---
 
-### 错误6：ESLint 检查失败导致构建中断
+### 错误7：ESLint 检查失败导致构建中断
 
 #### 错误信息
 ```
@@ -243,7 +281,7 @@ pnpm run lint:eslint  # 自动修复部分错误
 
 ---
 
-### 错误7：前端构建失败
+### 错误8：前端构建失败
 
 #### 错误信息
 ```
@@ -289,7 +327,7 @@ git push
 
 ---
 
-### 错误8：创建 Release 失败
+### 错误9：创建 Release 失败
 
 #### 错误信息
 ```
@@ -336,7 +374,7 @@ gh release delete v2.9.0 --yes
 
 ---
 
-### 错误9：磁盘空间不足
+### 错误10：磁盘空间不足
 
 #### 错误信息
 ```
@@ -380,7 +418,7 @@ GitHub Actions runner 磁盘空间有限（约14GB）
 
 ---
 
-### 错误10：网络超时
+### 错误11：网络超时
 
 #### 错误信息
 ```

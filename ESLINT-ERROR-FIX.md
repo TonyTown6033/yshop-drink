@@ -67,7 +67,7 @@ if (count.value > 0) {
 
 **原理**：
 - 开发环境保留 ESLint 检查
-- CI/CD 构建时临时禁用 ESLint
+- CI/CD 构建时通过环境变量禁用 ESLint
 - 不影响代码质量（开发时已检查）
 
 **已实现**：workflow 已自动处理
@@ -77,15 +77,24 @@ if (count.value > 0) {
 - name: Build Frontend
   run: |
     cd yshop-drink-vue3
-    # 临时禁用 eslint 插件
-    sed -i "s/import eslintPlugin/\/\/ import eslintPlugin/g" vite.config.ts
-    sed -i "s/eslintPlugin()/\/\/ eslintPlugin()/g" vite.config.ts
-    
-    # 构建
+    pnpm install --no-frozen-lockfile
     pnpm run build:prod
-    
-    # 恢复配置
-    mv vite.config.ts.bak vite.config.ts
+  env:
+    DISABLE_ESLINT: 'true'  # 禁用 ESLint 检查
+```
+
+```typescript
+// yshop-drink-vue3/build/vite/index.ts
+export function createVitePlugins() {
+  // 检查环境变量，CI/CD 环境中禁用 ESLint
+  const isCI = process.env.CI === 'true' || process.env.DISABLE_ESLINT === 'true'
+  
+  return [
+    // ... 其他插件
+    ...(!isCI ? [EslintPlugin({ /* ... */ })] : []),
+    // ... 其他插件
+  ]
+}
 ```
 
 **优点**：
