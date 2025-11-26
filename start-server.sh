@@ -873,8 +873,8 @@ start_frontend() {
     log_info "切换后目录: $(pwd)"
     
     # 检查前端是否已运行
-    if check_port 80; then
-        log_warning "前端服务已在运行 (端口 80)"
+    if check_port 8801; then
+        log_warning "前端服务已在运行 (端口 8801)"
         read -p "是否重启前端服务? (y/n) " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -921,10 +921,10 @@ start_frontend() {
         
         # 启动静态文件服务器
         log_info "启动静态文件服务器..."
-        log_info "命令: sudo http-server ${DIST_DIR} -p 80"
+        log_info "命令: http-server ${DIST_DIR} -p 8801"
         log_info "日志: ${LOG_DIR}/yshop-frontend.log"
         
-        sudo nohup http-server ${DIST_DIR} -p 80 \
+        nohup http-server ${DIST_DIR} -p 8801 \
             > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
         
         FRONTEND_PID=$!
@@ -950,11 +950,11 @@ start_frontend() {
         
         # 验证端口是否监听
         sleep 1
-        if check_port 80; then
-            log_success "✓ 端口 80 正在监听"
+        if check_port 8801; then
+            log_success "✓ 端口 8801 正在监听"
             log_success "前端服务启动成功（生产模式，使用 ${DIST_DIR}）"
         else
-            log_error "✗ 端口 80 未监听"
+            log_error "✗ 端口 8801 未监听"
             log_error "进程可能启动失败，查看日志: tail -50 ${LOG_DIR}/yshop-frontend.log"
             exit 1
         fi
@@ -996,7 +996,7 @@ start_frontend() {
     fi
     
     log_info "日志文件: ${LOG_DIR}/yshop-frontend.log"
-    log_info "前端地址: http://localhost:80"
+    log_info "前端地址: http://localhost:8801"
 }
 
 # 显示服务状态
@@ -1020,9 +1020,9 @@ show_status() {
     echo ""
     
     echo -e "${GREEN}前端服务:${NC}"
-    if check_port 80; then
+    if check_port 8801; then
         echo -e "  状态: ${GREEN}运行中${NC}"
-        echo -e "  地址: http://localhost:80"
+        echo -e "  地址: http://localhost:8801"
         if [ -f "${LOG_DIR}/frontend.pid" ]; then
             echo -e "  PID: $(cat ${LOG_DIR}/frontend.pid)"
         fi
@@ -1183,7 +1183,7 @@ main() {
     echo -e "${GREEN}🎉 启动成功！${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo ""
-    echo -e "管理后台: ${BLUE}http://localhost:80${NC}"
+    echo -e "管理后台: ${BLUE}http://localhost:8801${NC}"
     echo -e "默认账号: ${BLUE}admin${NC}"
     echo -e "默认密码: ${BLUE}admin123${NC}"
     echo ""
