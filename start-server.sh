@@ -838,7 +838,7 @@ start_backend() {
     log_info "启动后端服务..."
     
     # 启动服务（以实际用户身份后台运行）
-    sudo -u ${REAL_USER} nohup java -jar "${JAR_FILE}" \
+    sudo nohup java -jar "${JAR_FILE}" \
         --spring.profiles.active=local \
         > "${LOG_DIR}/yshop-server.log" 2>&1 &
     
@@ -877,26 +877,18 @@ start_frontend() {
         sleep 2
     fi
     
-    # 检查是否使用生产构建
-    DIST_DIR=""
-    if [ -d "dist-prod" ] && [ "$USE_PROD_BUILD" = "true" ]; then
-        DIST_DIR="dist-prod"
-        log_info "使用生产构建（dist-prod 目录）"
-    elif [ -d "dist" ] && [ "$USE_PROD_BUILD" = "true" ]; then
-        DIST_DIR="dist"
-        log_info "使用生产构建（dist 目录）"
-    fi
+    DIST_DIR="dist-prod"
     
     if [ -n "$DIST_DIR" ]; then
         # 检查是否安装了 http-server
         if ! command_exists http-server; then
             log_info "安装 http-server..."
-            sudo -u ${REAL_USER} npm install -g http-server
+            sudo npm install -g http-server
         fi
         
         # 启动静态文件服务器
         log_info "启动静态文件服务器..."
-        sudo -u ${REAL_USER} nohup http-server ${DIST_DIR} -p 80 \
+        sudo nohup http-server ${DIST_DIR} -p 80 \
             > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
         
         FRONTEND_PID=$!
@@ -916,7 +908,7 @@ start_frontend() {
             fi
             
             log_info "安装前端依赖..."
-            sudo -u ${REAL_USER} pnpm install 2>&1 | tee "${LOG_DIR}/frontend-install.log"
+            sudo pnpm install 2>&1 | tee "${LOG_DIR}/frontend-install.log"
             
             if [ $? -eq 0 ]; then
                 log_success "前端依赖安装成功"
@@ -931,7 +923,7 @@ start_frontend() {
         # 启动开发服务器（以实际用户身份）
         log_info "启动前端开发服务器..."
         
-        sudo -u ${REAL_USER} nohup pnpm run dev \
+        sudo nohup pnpm run dev \
             > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
         
         FRONTEND_PID=$!
