@@ -860,7 +860,17 @@ start_backend() {
 start_frontend() {
     print_title "启动管理界面前端"
     
+    # 调试信息
+    log_info "=== 前端启动调试信息 ==="
+    log_info "FRONTEND_DIR: ${FRONTEND_DIR}"
+    log_info "USE_PROD_BUILD: ${USE_PROD_BUILD}"
+    log_info "SKIP_BUILD: ${SKIP_BUILD}"
+    log_info "LOG_DIR: ${LOG_DIR}"
+    log_info "当前目录: $(pwd)"
+    log_info "=========================="
+    
     cd "${FRONTEND_DIR}"
+    log_info "切换后目录: $(pwd)"
     
     # 检查前端是否已运行
     if check_port 80; then
@@ -874,10 +884,33 @@ start_frontend() {
         # 停止现有服务
         log_info "停止现有前端服务..."
         pkill -f "vite" || true
+        pkill -f "http-server" || true
         sleep 2
     fi
     
-    DIST_DIR="dist-prod"
+    # 检查是否使用生产构建
+    DIST_DIR=""
+    
+    log_info "检查前端构建目录..."
+    log_info "  dist-prod 存在: $([ -d "dist-prod" ] && echo '是' || echo '否')"
+    log_info "  dist 存在: $([ -d "dist" ] && echo '是' || echo '否')"
+    log_info "  USE_PROD_BUILD=${USE_PROD_BUILD}"
+    
+    if [ -d "dist-prod" ] && [ "$USE_PROD_BUILD" = "true" ]; then
+        DIST_DIR="dist-prod"
+        log_info "✓ 使用生产构建（dist-prod 目录）"
+        log_info "  文件数量: $(find dist-prod -type f | wc -l)"
+        log_info "  index.html 存在: $([ -f "dist-prod/index.html" ] && echo '是' || echo '否')"
+    elif [ -d "dist" ] && [ "$USE_PROD_BUILD" = "true" ]; then
+        DIST_DIR="dist"
+        log_info "✓ 使用生产构建（dist 目录）"
+        log_info "  文件数量: $(find dist -type f | wc -l)"
+    elif [ "$USE_PROD_BUILD" = "true" ]; then
+        log_error "USE_PROD_BUILD=true 但未找到 dist-prod 或 dist 目录"
+        log_info "当前目录内容:"
+        ls -la
+        exit 1
+    fi
     
     if [ -n "$DIST_DIR" ]; then
         # 检查是否安装了 http-server
@@ -888,15 +921,43 @@ start_frontend() {
         
         # 启动静态文件服务器
         log_info "启动静态文件服务器..."
+        log_info "命令: sudo http-server ${DIST_DIR} -p 80"
+        log_info "日志: ${LOG_DIR}/yshop-frontend.log"
+        
         sudo nohup http-server ${DIST_DIR} -p 80 \
             > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
         
         FRONTEND_PID=$!
+        log_info "前端进程 PID: ${FRONTEND_PID}"
         echo $FRONTEND_PID > "${LOG_DIR}/frontend.pid"
         chown ${REAL_USER}:${REAL_USER} "${LOG_DIR}/frontend.pid"
         
-        log_info "前端进程 PID: ${FRONTEND_PID}"
-        log_success "前端服务启动成功（生产模式，使用 ${DIST_DIR}）"
+        # 等待一下让进程启动
+        sleep 2
+        
+        # 验证进程是否还在运行
+        if ps -p ${FRONTEND_PID} > /dev/null 2>&1; then
+            log_success "✓ 前端进程正在运行"
+        else
+            log_error "✗ 前端进程启动后立即退出"
+            log_error "查看日志: tail -50 ${LOG_DIR}/yshop-frontend.log"
+            if [ -f "${LOG_DIR}/yshop-frontend.log" ]; then
+                log_error "最后几行日志:"
+                tail -10 "${LOG_DIR}/yshop-frontend.log" | sed 's/^/  /'
+            fi
+            exit 1
+        fi
+        
+        # 验证端口是否监听
+        sleep 1
+        if check_port 80; then
+            log_success "✓ 端口 80 正在监听"
+            log_success "前端服务启动成功（生产模式，使用 ${DIST_DIR}）"
+        else
+            log_error "✗ 端口 80 未监听"
+            log_error "进程可能启动失败，查看日志: tail -50 ${LOG_DIR}/yshop-frontend.log"
+            exit 1
+        fi
     else
         # 开发模式
         # 检查是否已安装依赖（以实际用户身份）
