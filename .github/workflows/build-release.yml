@@ -107,7 +107,7 @@ jobs:
           mkdir -p deploy/frontend
           
           # 复制后端 jar
-          cp yshop-drink-boot3/yshop-server/target/yshop-server-*.jar deploy/backend/
+          cp yshop-drink-boot3/yshop-server/target/yshop-server*.jar deploy/backend/
           
           # 复制前端 dist
           cp -r yshop-drink-vue3/dist deploy/frontend/
