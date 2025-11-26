@@ -11,6 +11,7 @@
 | 3️⃣ | build 脚本不存在 | 使用 build:prod | ✅ |
 | 4️⃣ | ESLint 阻止构建 | 环境变量优雅控制 | ✅ |
 | 5️⃣ | Maven 命令错误 | 修正为 package -DskipTests | ✅ |
+| 5️⃣.1 | 通配符检查失败 | 使用 find 替代 [ -f * ] | ✅ |
 
 ---
 

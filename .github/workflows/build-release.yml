@@ -79,7 +79,7 @@ jobs:
           mvn clean package -DskipTests -T 1C
           
           # 验证 jar 文件是否生成（使用 compgen 或 find）
-          JAR_COUNT=$(find yshop-server/target -name "yshop-server-*.jar" -type f 2>/dev/null | wc -l)
+          JAR_COUNT=$(find yshop-server/target -name "yshop-server*.jar" -type f 2>/dev/null | wc -l)
           
           if [ "$JAR_COUNT" -eq 0 ]; then
             echo "Error: JAR file not found after build"
@@ -90,7 +90,7 @@ jobs:
           
           echo "Backend build successful"
           echo "Found $JAR_COUNT jar file(s):"
-          find yshop-server/target -name "yshop-server-*.jar" -type f -exec ls -lh {} \;
+          find yshop-server/target -name "yshop-server*.jar" -type f -exec ls -lh {} \;
       
       - name: Build Frontend
         run: |
