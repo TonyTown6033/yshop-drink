@@ -391,11 +391,16 @@ download_github_release() {
         fi
     fi
     
-    # 复制前端 dist
-    if [ -d "${temp_dir}/frontend/dist" ]; then
+    # 复制前端 dist-prod（GitHub Actions 构建产物）
+    if [ -d "${temp_dir}/frontend/dist-prod" ]; then
+        rm -rf "${FRONTEND_DIR}/dist-prod"
+        cp -r "${temp_dir}/frontend/dist-prod" "${FRONTEND_DIR}/"
+        log_success "前端文件已复制（dist-prod）"
+    elif [ -d "${temp_dir}/frontend/dist" ]; then
+        # 兼容旧版本（如果有 dist 目录）
         rm -rf "${FRONTEND_DIR}/dist"
         cp -r "${temp_dir}/frontend/dist" "${FRONTEND_DIR}/"
-        log_success "前端文件已复制"
+        log_success "前端文件已复制（dist）"
     fi
     
     # 显示版本信息
@@ -841,9 +846,16 @@ start_frontend() {
     fi
     
     # 检查是否使用生产构建
-    if [ -d "dist" ] && [ "$USE_PROD_BUILD" = "true" ]; then
+    DIST_DIR=""
+    if [ -d "dist-prod" ] && [ "$USE_PROD_BUILD" = "true" ]; then
+        DIST_DIR="dist-prod"
+        log_info "使用生产构建（dist-prod 目录）"
+    elif [ -d "dist" ] && [ "$USE_PROD_BUILD" = "true" ]; then
+        DIST_DIR="dist"
         log_info "使用生产构建（dist 目录）"
-        
+    fi
+    
+    if [ -n "$DIST_DIR" ]; then
         # 检查是否安装了 http-server
         if ! command_exists http-server; then
             log_info "安装 http-server..."
@@ -852,7 +864,7 @@ start_frontend() {
         
         # 启动静态文件服务器
         log_info "启动静态文件服务器..."
-        sudo -u ${REAL_USER} nohup http-server dist -p 80 \
+        sudo -u ${REAL_USER} nohup http-server ${DIST_DIR} -p 80 \
             > "${LOG_DIR}/yshop-frontend.log" 2>&1 &
         
         FRONTEND_PID=$!
@@ -860,7 +872,7 @@ start_frontend() {
         chown ${REAL_USER}:${REAL_USER} "${LOG_DIR}/frontend.pid"
         
         log_info "前端进程 PID: ${FRONTEND_PID}"
-        log_success "前端服务启动成功（生产模式）"
+        log_success "前端服务启动成功（生产模式，使用 ${DIST_DIR}）"
     else
         # 开发模式
         # 检查是否已安装依赖（以实际用户身份）
