@@ -379,9 +379,9 @@ download_github_release() {
     # 复制后端 jar
     if [ -d "${temp_dir}/backend" ]; then
         mkdir -p "${BACKEND_DIR}/yshop-server/target"
-        cp ${temp_dir}/backend/yshop-server-*.jar "${BACKEND_DIR}/yshop-server/target/" 2>/dev/null || true
+        cp ${temp_dir}/backend/yshop-server*.jar "${BACKEND_DIR}/yshop-server/target/" 2>/dev/null || true
         
-        local jar_file=$(ls ${BACKEND_DIR}/yshop-server/target/yshop-server-*.jar 2>/dev/null | head -n 1)
+        local jar_file=$(ls ${BACKEND_DIR}/yshop-server/target/yshop-server*.jar 2>/dev/null | head -n 1)
         if [ -n "$jar_file" ]; then
             log_success "后端文件已复制: $(basename $jar_file)"
         else
