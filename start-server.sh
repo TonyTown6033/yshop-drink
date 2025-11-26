@@ -306,12 +306,12 @@ download_github_release() {
         fi
     fi
     
-    # 如果还是没有仓库信息
+    # 如果还是没有仓库信息，使用默认仓库
     if [ -z "$repo" ]; then
-        log_error "无法确定 GitHub 仓库"
-        log_info "请使用 --github-repo 参数指定仓库"
+        repo="TonyTown6033/yshop-drink"
+        log_warning "未指定仓库，使用默认仓库: ${repo}"
+        log_info "如需使用其他仓库，请使用 --github-repo 参数"
         log_info "例如: --github-repo username/yshop-drink"
-        exit 1
     fi
     
     log_info "GitHub 仓库: ${repo}"
@@ -319,14 +319,29 @@ download_github_release() {
     # 如果没有指定版本，获取最新版本
     if [ -z "$version" ]; then
         log_info "获取最新版本信息..."
-        version=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        
+        # 尝试使用 GitHub API 获取最新版本
+        local api_response=$(curl -s -w "\n%{http_code}" "https://api.github.com/repos/${repo}/releases/latest")
+        local http_code=$(echo "$api_response" | tail -n1)
+        local response_body=$(echo "$api_response" | sed '$d')
+        
+        if [ "$http_code" = "200" ]; then
+            version=$(echo "$response_body" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        elif [ "$http_code" = "403" ]; then
+            log_warning "GitHub API 请求受限，尝试备用方法..."
+            # 尝试从 releases 页面获取
+            version=$(curl -sL "https://github.com/${repo}/releases" | grep -oP 'releases/tag/\K[^"]+' | head -n 1)
+        fi
         
         if [ -z "$version" ]; then
             log_error "无法获取最新版本信息"
             log_info "请检查："
-            echo "  1. 仓库是否存在"
-            echo "  2. 是否有发布的 Release"
+            echo "  1. 仓库是否存在: https://github.com/${repo}"
+            echo "  2. 是否有发布的 Release: https://github.com/${repo}/releases"
             echo "  3. 网络连接是否正常"
+            echo ""
+            echo "或者手动指定版本："
+            echo "  sudo ./start-server.sh --github-release v1.1.2"
             exit 1
         fi
         
@@ -338,6 +353,8 @@ download_github_release() {
     local download_url="https://github.com/${repo}/releases/download/${version}/${package_name}"
     local checksum_url="${download_url}.sha256"
     
+    log_info "版本: ${version}"
+    log_info "仓库: https://github.com/${repo}"
     log_info "下载地址: ${download_url}"
     
     # 创建临时目录
@@ -345,14 +362,29 @@ download_github_release() {
     mkdir -p "${temp_dir}"
     
     # 下载部署包
-    log_info "下载部署包..."
-    if ! curl -L -o "${temp_dir}/${package_name}" "${download_url}"; then
+    log_info "开始下载部署包（可能需要几分钟）..."
+    if curl -L --progress-bar -o "${temp_dir}/${package_name}" "${download_url}"; then
+        log_success "下载完成"
+        
+        # 显示文件大小
+        local file_size=$(du -h "${temp_dir}/${package_name}" | cut -f1)
+        log_info "文件大小: ${file_size}"
+    else
         log_error "下载失败"
+        log_info "请检查："
+        echo "  1. 网络连接是否正常"
+        echo "  2. Release 是否存在: https://github.com/${repo}/releases/tag/${version}"
+        echo "  3. 文件是否已上传: ${package_name}"
+        echo ""
+        echo "你也可以手动下载并部署："
+        echo "  wget ${download_url}"
+        echo "  tar -xzf ${package_name}"
+        echo "  cp backend/yshop-server*.jar yshop-drink-boot3/yshop-server/target/"
+        echo "  cp -r frontend/dist-prod yshop-drink-vue3/"
+        echo "  sudo ./start-server.sh --skip-build --prod-frontend"
         rm -rf "${temp_dir}"
         exit 1
     fi
-    
-    log_success "下载完成"
     
     # 下载校验和
     log_info "下载校验文件..."
