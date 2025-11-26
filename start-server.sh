@@ -758,7 +758,7 @@ start_backend() {
     fi
     
     # 查找 jar 文件
-    JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server-*.jar" 2>/dev/null | head -n 1)
+    JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server*.jar" 2>/dev/null | head -n 1)
     
     # 如果没有找到 jar 文件，或者设置了强制编译，则进行编译
     if [ -z "$JAR_FILE" ] || [ "$SKIP_BUILD" != "true" ]; then
@@ -786,7 +786,7 @@ start_backend() {
         fi
         
         # 重新查找 jar 文件
-        JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server-*.jar" | head -n 1)
+        JAR_FILE=$(find "${BACKEND_DIR}/yshop-server/target" -name "yshop-server*.jar" | head -n 1)
         
         if [ -z "$JAR_FILE" ]; then
             log_error "编译后仍未找到 jar 文件"
