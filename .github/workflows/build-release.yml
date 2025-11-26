@@ -78,15 +78,19 @@ jobs:
           cd yshop-drink-boot3
           mvn clean package -DskipTests -T 1C
           
-          # 验证 jar 文件是否生成
-          if [ ! -f yshop-server/target/yshop-server-*.jar ]; then
+          # 验证 jar 文件是否生成（使用 compgen 或 find）
+          JAR_COUNT=$(find yshop-server/target -name "yshop-server-*.jar" -type f 2>/dev/null | wc -l)
+          
+          if [ "$JAR_COUNT" -eq 0 ]; then
             echo "Error: JAR file not found after build"
-            ls -la yshop-server/target/
+            echo "Listing target directory:"
+            ls -la yshop-server/target/ || echo "Target directory not found"
             exit 1
           fi
           
           echo "Backend build successful"
-          ls -lh yshop-server/target/yshop-server-*.jar
+          echo "Found $JAR_COUNT jar file(s):"
+          find yshop-server/target -name "yshop-server-*.jar" -type f -exec ls -lh {} \;
       
       - name: Build Frontend
         run: |
