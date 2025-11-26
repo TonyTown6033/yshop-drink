@@ -109,8 +109,8 @@ jobs:
           # 复制后端 jar
           cp yshop-drink-boot3/yshop-server/target/yshop-server*.jar deploy/backend/
           
-          # 复制前端 dist
-          cp -r yshop-drink-vue3/dist deploy/frontend/
+          # 复制前端 dist-prod
+          cp -r yshop-drink-vue3/dist-prod deploy/frontend/
           
           # 创建版本信息
           echo "Version: ${GITHUB_REF_NAME}" > deploy/VERSION
@@ -139,7 +139,7 @@ jobs:
           ## 文件说明
           
           - `backend/yshop-server-*.jar` - 后端服务
-          - `frontend/dist/` - 前端构建产物
+          - `frontend/dist-prod/` - 前端构建产物
           - `VERSION` - 版本信息
           EOFREADME
       
